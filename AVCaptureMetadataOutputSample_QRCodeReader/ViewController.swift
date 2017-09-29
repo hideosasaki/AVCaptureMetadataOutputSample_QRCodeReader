@@ -18,17 +18,22 @@ class ViewController: UIViewController, AVCaptureMetadataOutputObjectsDelegate {
     let captureSession = AVCaptureSession()
     var videoLayer: AVCaptureVideoPreviewLayer?
     
-    var qrView: UIView!
+    var qrViews: [UIView] = []
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
+        textField.isEditable = false
+        
         // QRコードをマークするビュー
-        qrView = UIView()
-        qrView.layer.borderWidth = 4
-        qrView.layer.borderColor = UIColor.red.cgColor
-        qrView.frame = CGRect(x: 0, y: 0, width: 0, height: 0)
-        view.addSubview(qrView)
+        for _ in 0...3 {
+            let qrView: UIView = UIView()
+            qrView.layer.borderWidth = 4
+            qrView.layer.borderColor = UIColor.red.cgColor
+            qrView.frame = CGRect(x: 0, y: 0, width: 0, height: 0)
+            view.addSubview(qrView)
+            qrViews.append(qrView)
+        }
         
         // 入力（背面カメラ）
         let videoDevice = AVCaptureDevice.defaultDevice(withMediaType: AVMediaTypeVideo)
@@ -41,8 +46,9 @@ class ViewController: UIViewController, AVCaptureMetadataOutputObjectsDelegate {
         
         // QRコードを検出した際のデリゲート設定
         metadataOutput.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
-        // QRコードの認識を設定
-        metadataOutput.metadataObjectTypes = [AVMetadataObjectTypeQRCode]
+        
+        // QRコード, Code39の認識を設定
+        metadataOutput.metadataObjectTypes = [AVMetadataObjectTypeQRCode, AVMetadataObjectTypeCode39Code]
 
         // プレビュー表示
         videoLayer = AVCaptureVideoPreviewLayer.init(session: captureSession)
@@ -57,18 +63,23 @@ class ViewController: UIViewController, AVCaptureMetadataOutputObjectsDelegate {
     }
 
     func captureOutput(_ captureOutput: AVCaptureOutput!, didOutputMetadataObjects metadataObjects: [Any]!, from connection: AVCaptureConnection!) {
+        for qrView in qrViews {
+            qrView.frame = CGRect(x: 0, y: 0, width: 0, height: 0)
+        }
+        textField.text = ""
+        var i = 0
         // 複数のメタデータを検出できる
+        // QRコードは 最大4つまで認識可能
+        // Code39は画面中央あたりで１つのみ認識可能
         for metadata in metadataObjects as! [AVMetadataMachineReadableCodeObject] {
-            // QRコードのデータかどうかの確認
-            if metadata.type == AVMetadataObjectTypeQRCode {
-                // 検出位置を取得
-                let barCode = videoLayer?.transformedMetadataObject(for: metadata) as! AVMetadataMachineReadableCodeObject
-                qrView!.frame = barCode.bounds
-                if metadata.stringValue != nil {
-                    // 検出データを取得
-                    textField.text = metadata.stringValue!
-                }
+            // 検出位置を取得
+            let barCode = videoLayer?.transformedMetadataObject(for: metadata) as! AVMetadataMachineReadableCodeObject
+            qrViews[i].frame = barCode.bounds
+            if metadata.stringValue != nil {
+                // 検出データを取得
+                textField.text.append(metadata.stringValue! + " ")
             }
+            i = i + 1
         }
     }
 }
